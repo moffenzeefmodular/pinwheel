@@ -69,7 +69,7 @@ struct Pinwheel : Module {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
         configParam(SPEED_PARAM, 0.f, 1.f, 0.5f, "Speed");
         configParam(MASS_PARAM, 0.f, 1.f, 0.f, "Mass");
-        configParam(NUMBLADES_PARAM, 1.f, 8.f, 4.f, "Number of Blades");
+        configSwitch(NUMBLADES_PARAM, 1.f, 8.f, 4.f, "Number of Blades", {"1", "2", "3", "4", "5", "6", "7", "8"});
         configInput(SPEEDCVIN_INPUT, "Speed CV In");
         configInput(MASSCVIN_INPUT, "Mass CV In");
         configOutput(GATE1OUT_OUTPUT, "Gate Out");
