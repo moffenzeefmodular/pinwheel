@@ -1,0 +1,23 @@
+{
+  "slug": "Pinwheel",
+  "name": "Pinwheel",
+  "version": "2.0.0",
+  "license": "proprietary",
+  "brand": "Pinwheel",
+  "author": "",
+  "authorEmail": "",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "Pinwheel",
+      "name": "Pinwheel",
+      "description": "",
+      "tags": []
+    }
+  ]
+}
