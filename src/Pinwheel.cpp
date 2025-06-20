@@ -77,47 +77,44 @@ struct Pinwheel : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float knobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
-        float cvVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-        float combinedVoltage = clamp(knobVoltage + cvVoltage, -5.f, 5.f);
-        float combinedParam = rescale(combinedVoltage, -5.f, 5.f, 0.f, 1.f);
-        float targetSpeed = (combinedParam - 0.5f) * 2.f;
+    float knobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+    float cvVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float combinedVoltage = clamp(knobVoltage + cvVoltage, -5.f, 5.f);
+    float combinedParam = rescale(combinedVoltage, -5.f, 5.f, 0.f, 1.f);
+    float targetSpeed = (combinedParam - 0.5f) * 2.f;
 
-        float massKnobVoltage = rescale(params[MASS_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
-        float massCVVoltage = inputs[MASSCVIN_INPUT].isConnected() ? clamp(inputs[MASSCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-        float massCombinedVoltage = clamp(massKnobVoltage + massCVVoltage, -5.f, 5.f);
-        float combinedMass = rescale(massCombinedVoltage, -5.f, 5.f, 0.f, 1.f);
+    float massKnobVoltage = rescale(params[MASS_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+    float massCVVoltage = inputs[MASSCVIN_INPUT].isConnected() ? clamp(inputs[MASSCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float massCombinedVoltage = clamp(massKnobVoltage + massCVVoltage, -5.f, 5.f);
+    float combinedMass = rescale(massCombinedVoltage, -5.f, 5.f, 0.f, 1.f);
 
-        float maxSlewTime = 1.0f;
-        float minSlewTime = 0.001f;
-        float slewTime = rescale(combinedMass, 0.f, 1.f, minSlewTime, maxSlewTime);
-        float slewAmount = clamp(args.sampleTime / slewTime, 0.f, 1.f);
+    float maxSlewTime = 1.f;
+    float minSlewTime = 0.001f;
+    float slewTime = rescale(combinedMass, 0.f, 1.f, minSlewTime, maxSlewTime);
+    float slewAmount = clamp(args.sampleTime / slewTime, 0.f, 1.f);
 
-        slewedSpeed += (targetSpeed - slewedSpeed) * slewAmount;
+    slewedSpeed += (targetSpeed - slewedSpeed) * slewAmount;
 
-        float rotationRate = slewedSpeed * 8.f * M_PI;
-        angle += rotationRate * args.sampleTime;
-        if (angle >= 2.f * M_PI)
-            angle -= 2.f * M_PI;
-        else if (angle < 0.f)
-            angle += 2.f * M_PI;
+    float rotationRate = slewedSpeed * 8.f * M_PI;
+    angle += rotationRate * args.sampleTime;
+    if (angle >= 2.f * M_PI) angle -= 2.f * M_PI;
+    else if (angle < 0.f) angle += 2.f * M_PI;
 
-        float bladeAngle = angle;
+    int numberOfBlades = clamp((int)std::round(params[NUMBLADES_PARAM].getValue()), 1, 8);
 
-        // Rotate so 0 = noon
+    for (int i = 0; i < numberOfBlades; ++i) {
+        float bladeAngle = angle + (2.f * M_PI / numberOfBlades) * i;
+        if (bladeAngle >= 2.f * M_PI) bladeAngle -= 2.f * M_PI;
+
         float shiftedAngle = bladeAngle - (M_PI / 2.f);
-        if (shiftedAngle < 0.f)
-            shiftedAngle += 2.f * M_PI;
+        if (shiftedAngle < 0.f) shiftedAngle += 2.f * M_PI;
 
-        float CV1OUT = 0.f;
-        if (shiftedAngle <= M_PI) {
-            CV1OUT = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
-        } else {
-            CV1OUT = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
-        }
-        outputs[CV1OUT_OUTPUT].setVoltage(CV1OUT);
+        float CVout = 0.f;
+        if (shiftedAngle <= M_PI) CVout = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
+        else CVout = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
 
-        // Gate detection
+        outputs[CV1OUT_OUTPUT + i].setVoltage(CVout);
+
         const float side = 25.f * 0.7f;
         const float flatHeight = side * 0.866f;
         float tipRadius = side + flatHeight;
@@ -126,9 +123,22 @@ struct Pinwheel : Module {
         float tipY = -tipRadius * sin(bladeAngle);
 
         const float stemWidth = 5.f;
-        gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
-        outputs[GATE1OUT_OUTPUT].setVoltage(gateActive ? 10.f : 0.f);
+        bool gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
+
+        outputs[GATE1OUT_OUTPUT + i].setVoltage(gateActive ? 5.f : 0.f);
+
+        lights[GATE1LED_LIGHT + i].setBrightnessSmooth(gateActive ? 1.f : 0.f, args.sampleTime);
+
+        // Corrected LED indexing here (removed +1 from red LED)
+        if (CVout >= 0.f) {
+            lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
+            lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+        } else {
+            lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
+        }
     }
+}
 };
 
 struct PinwheelDisplay : Widget {
