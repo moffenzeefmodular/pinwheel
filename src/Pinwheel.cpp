@@ -25,7 +25,7 @@ struct Pinwheel : Module {
 
     Pinwheel() {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-        configParam(SPEED_PARAM, 0.f, 1.f, 0.f, "Speed");
+        configParam(SPEED_PARAM, 0.f, 1.f, 0.5f, "Speed");
         configParam(MASS_PARAM, 0.f, 1.f, 0.f, "Mass");
         configParam(NUM_BLADES_PARAM, 1.f, 8.f, 4.f, "Number of Blades");
         configInput(SPEEDCVIN_INPUT, "Speed CV In");
@@ -34,13 +34,19 @@ struct Pinwheel : Module {
         configOutput(CVOUT_OUTPUT, "CV Out");
     }
 
-    void process(const ProcessArgs& args) override {
-        float speed = params[SPEED_PARAM].getValue();
-        float rotationRate = speed * 2.f * M_PI;
-        angle += rotationRate * args.sampleTime;
-        if (angle >= 2.f * M_PI)
-            angle -= 2.f * M_PI;
-    }
+void process(const ProcessArgs& args) override {
+    float knobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+    float cvVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float combinedVoltage = clamp(knobVoltage + cvVoltage, -5.f, 5.f);
+    float combinedParam = rescale(combinedVoltage, -5.f, 5.f, 0.f, 1.f);
+    float normalizedSpeed = (combinedParam - 0.5f) * 2.f;
+    float rotationRate = normalizedSpeed * 2.f * M_PI;
+    angle += rotationRate * args.sampleTime;
+    if (angle >= 2.f * M_PI)
+        angle -= 2.f * M_PI;
+    else if (angle < 0.f)
+        angle += 2.f * M_PI;
+}
 };
 
 struct PinwheelDisplay : Widget {
