@@ -1,25 +1,56 @@
 #include "plugin.hpp"
 
 struct Pinwheel : Module {
-    enum ParamId {
-        SPEED_PARAM,
-        MASS_PARAM,
-        NUM_BLADES_PARAM,
-        PARAMS_LEN
-    };
-    enum InputId {
-        SPEEDCVIN_INPUT,
-        MASSCVIN_INPUT,
-        INPUTS_LEN
-    };
-    enum OutputId {
-        GATEOUT_OUTPUT,
-        CVOUT_OUTPUT,
-        OUTPUTS_LEN
-    };
-    enum LightId {
-        LIGHTS_LEN
-    };
+	enum ParamId {
+		NUMBLADES_PARAM,
+		SPEED_PARAM,
+		MASS_PARAM,
+		PARAMS_LEN
+	};
+	enum InputId {
+		SPEEDCVIN_INPUT,
+		NUMBLADESCVIN_INPUT,
+		MASSCVIN_INPUT,
+		INPUTS_LEN
+	};
+	enum OutputId {
+		GATE1OUT_OUTPUT,
+		GATE2OUT_OUTPUT,
+		GATE3OUT_OUTPUT,
+		GATE4OUT_OUTPUT,
+		GATE5OUT_OUTPUT,
+		GATE6OUT_OUTPUT,
+		GATE7OUT_OUTPUT,
+		GATE8OUT_OUTPUT,
+		CV1OUT_OUTPUT,
+		CV2OUT_OUTPUT,
+		CV3OUT_OUTPUT,
+		CV4OUT_OUTPUT,
+		CV5OUT_OUTPUT,
+		CV6OUT_OUTPUT,
+		CV7OUT_OUTPUT,
+		CV8OUT_OUTPUT,
+		OUTPUTS_LEN
+	};
+	enum LightId {
+		GATE1LED_LIGHT,
+		GATE2LED_LIGHT,
+		GATE3LED_LIGHT,
+		GATE4LED_LIGHT,
+		GATE6LED_LIGHT,
+		GATE5LED_LIGHT,
+		GATE7LED_LIGHT,
+		GATE8LED_LIGHT,
+		CV1LED_LIGHT,
+		CV2LED_LIGHT,
+		CV3LED_LIGHT,
+		CV4LED_LIGHT,
+		CV5LED_LIGHT,
+		CV6LED_LIGHT,
+		CV7LED_LIGHT,
+		CV8LED_LIGHT,
+		LIGHTS_LEN
+	};
 
     float angle = 0.f;
     float slewedSpeed = 0.f;
@@ -29,11 +60,11 @@ struct Pinwheel : Module {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
         configParam(SPEED_PARAM, 0.f, 1.f, 0.5f, "Speed");
         configParam(MASS_PARAM, 0.f, 1.f, 0.f, "Mass");
-        configParam(NUM_BLADES_PARAM, 1.f, 8.f, 4.f, "Number of Blades");
+        configParam(NUMBLADES_PARAM, 1.f, 8.f, 4.f, "Number of Blades");
         configInput(SPEEDCVIN_INPUT, "Speed CV In");
         configInput(MASSCVIN_INPUT, "Mass CV In");
-        configOutput(GATEOUT_OUTPUT, "Gate Out");
-        configOutput(CVOUT_OUTPUT, "CV Out");
+        configOutput(GATE1OUT_OUTPUT, "Gate Out");
+        configOutput(CV1OUT_OUTPUT, "CV Out");
     }
 
     void process(const ProcessArgs& args) override {
@@ -69,13 +100,13 @@ struct Pinwheel : Module {
         if (shiftedAngle < 0.f)
             shiftedAngle += 2.f * M_PI;
 
-        float cvOut = 0.f;
+        float CV1OUT = 0.f;
         if (shiftedAngle <= M_PI) {
-            cvOut = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
+            CV1OUT = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
         } else {
-            cvOut = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
+            CV1OUT = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
         }
-        outputs[CVOUT_OUTPUT].setVoltage(cvOut);
+        outputs[CV1OUT_OUTPUT].setVoltage(CV1OUT);
 
         // Gate detection
         const float side = 25.f * 0.7f;
@@ -87,7 +118,7 @@ struct Pinwheel : Module {
 
         const float stemWidth = 5.f;
         gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
-        outputs[GATEOUT_OUTPUT].setVoltage(gateActive ? 10.f : 0.f);
+        outputs[GATE1OUT_OUTPUT].setVoltage(gateActive ? 10.f : 0.f);
     }
 };
 
@@ -181,7 +212,7 @@ struct PinwheelDisplay : Widget {
         float side = 25.f * 0.7f;
         float flatHeight = side * 0.866f;
 
-        int numberOfBlades = clamp((int)std::round(module->params[Pinwheel::NUM_BLADES_PARAM].getValue()), 1, 8);
+        int numberOfBlades = clamp((int)std::round(module->params[Pinwheel::NUMBLADES_PARAM].getValue()), 1, 8);
 
         for (int i = 0; i < numberOfBlades; ++i) {
             float hue = (float)i / numberOfBlades;
@@ -202,15 +233,16 @@ struct PinwheelDisplay : Widget {
     }
 };
 
-struct PinwheelWidget : ModuleWidget {
-    PinwheelWidget(Pinwheel* module) {
-        setModule(module);
-        setPanel(createPanel(asset::plugin(pluginInstance, "res/Pinwheel.svg")));
 
-        addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
-        addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-        addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-        addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+struct PinwheelWidget : ModuleWidget {
+	PinwheelWidget(Pinwheel* module) {
+		setModule(module);
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/Pinwheel.svg")));
+
+		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
+		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
+		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
         auto* display = new PinwheelDisplay(module);
         display->box.size = Vec(120, 120);
@@ -220,16 +252,49 @@ struct PinwheelWidget : ModuleWidget {
         );
         addChild(display);
 
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.585, 112.669)), module, Pinwheel::SPEED_PARAM));
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(39.203, 112.669)), module, Pinwheel::MASS_PARAM));
-        addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(67.5, 75)), module, Pinwheel::NUM_BLADES_PARAM));
 
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.55, 112.669)), module, Pinwheel::SPEEDCVIN_INPUT));
-        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(49.168, 112.669)), module, Pinwheel::MASSCVIN_INPUT));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(17.242, 94.016)), module, Pinwheel::NUMBLADES_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(7.15, 106.186)), module, Pinwheel::SPEED_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(27.039, 106.186)), module, Pinwheel::MASS_PARAM));
 
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(69.363, 112.669)), module, Pinwheel::GATEOUT_OUTPUT));
-        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(86.956, 112.669)), module, Pinwheel::CVOUT_OUTPUT));
-    }
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.15, 119.858)), module, Pinwheel::SPEEDCVIN_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(17.242, 119.858)), module, Pinwheel::NUMBLADESCVIN_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(27.039, 119.858)), module, Pinwheel::MASSCVIN_INPUT));
+
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(37.372, 101.159)), module, Pinwheel::GATE1OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(46.501, 101.159)), module, Pinwheel::GATE2OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(54.967, 101.159)), module, Pinwheel::GATE3OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(63.434, 101.159)), module, Pinwheel::GATE4OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(71.901, 101.159)), module, Pinwheel::GATE5OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(80.103, 101.159)), module, Pinwheel::GATE6OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(88.569, 101.159)), module, Pinwheel::GATE7OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(96.771, 101.159)), module, Pinwheel::GATE8OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(37.372, 117.829)), module, Pinwheel::CV1OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(46.501, 117.829)), module, Pinwheel::CV2OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(54.967, 117.829)), module, Pinwheel::CV3OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(63.434, 117.829)), module, Pinwheel::CV4OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(71.901, 117.829)), module, Pinwheel::CV5OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(80.103, 117.829)), module, Pinwheel::CV6OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(88.569, 117.829)), module, Pinwheel::CV7OUT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(96.771, 117.829)), module, Pinwheel::CV8OUT_OUTPUT));
+
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(37.372, 93.046)), module, Pinwheel::GATE1LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(46.501, 93.046)), module, Pinwheel::GATE2LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(54.967, 93.046)), module, Pinwheel::GATE3LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(63.434, 93.046)), module, Pinwheel::GATE4LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(80.114, 92.947)), module, Pinwheel::GATE6LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 93.046)), module, Pinwheel::GATE5LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(88.569, 93.046)), module, Pinwheel::GATE7LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 93.046)), module, Pinwheel::GATE8LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(37.372, 109.891)), module, Pinwheel::CV1LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(46.501, 109.891)), module, Pinwheel::CV2LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(54.967, 109.891)), module, Pinwheel::CV3LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(63.434, 109.891)), module, Pinwheel::CV4LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 109.891)), module, Pinwheel::CV5LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(80.103, 109.891)), module, Pinwheel::CV6LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(88.569, 109.891)), module, Pinwheel::CV7LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 109.891)), module, Pinwheel::CV8LED_LIGHT));
+	}
 };
 
 Model* modelPinwheel = createModel<Pinwheel, PinwheelWidget>("Pinwheel");
