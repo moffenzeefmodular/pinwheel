@@ -41,16 +41,25 @@ struct Pinwheel : Module {
 		GATE5LED_LIGHT,
 		GATE7LED_LIGHT,
 		GATE8LED_LIGHT,
-		CV1LED_LIGHT,
-		CV2LED_LIGHT,
-		CV3LED_LIGHT,
-		CV4LED_LIGHT,
-		CV5LED_LIGHT,
-		CV6LED_LIGHT,
-		CV7LED_LIGHT,
-		CV8LED_LIGHT,
+		CV1GREENLED_LIGHT,
+		CV1REDLED_LIGHT,
+		CV2GREENLED_LIGHT,
+		CV2REDLED_LIGHT,
+		CV3GREENLED_LIGHT,
+		CV3REDLED_LIGHT,
+		CV4GREENLED_LIGHT,
+		CV4REDLED_LIGHT,
+		CV5GREENLED_LIGHT,
+		CV5REDLED_LIGHT,
+		CV6GREENLED_LIGHT,
+		CV6REDLED_LIGHT,
+		CV7GREENLED_LIGHT,
+		CV7REDLED_LIGHT,
+		CV8GREENLED_LIGHT,
+		CV8REDLED_LIGHT,
 		LIGHTS_LEN
 	};
+
 
     float angle = 0.f;
     float slewedSpeed = 0.f;
@@ -234,6 +243,7 @@ struct PinwheelDisplay : Widget {
 };
 
 
+
 struct PinwheelWidget : ModuleWidget {
 	PinwheelWidget(Pinwheel* module) {
 		setModule(module);
@@ -244,14 +254,13 @@ struct PinwheelWidget : ModuleWidget {
 		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
-        auto* display = new PinwheelDisplay(module);
+		      auto* display = new PinwheelDisplay(module);
         display->box.size = Vec(120, 120);
         display->box.pos = Vec(
             (box.size.x - 120) / 2.f,
             (box.size.y - 120) / 2.f - 50.f
         );
         addChild(display);
-
 
 		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(17.242, 94.016)), module, Pinwheel::NUMBLADES_PARAM));
 		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(7.15, 106.186)), module, Pinwheel::SPEED_PARAM));
@@ -286,14 +295,22 @@ struct PinwheelWidget : ModuleWidget {
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 93.046)), module, Pinwheel::GATE5LED_LIGHT));
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(88.569, 93.046)), module, Pinwheel::GATE7LED_LIGHT));
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 93.046)), module, Pinwheel::GATE8LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(37.372, 109.891)), module, Pinwheel::CV1LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(46.501, 109.891)), module, Pinwheel::CV2LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(54.967, 109.891)), module, Pinwheel::CV3LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(63.434, 109.891)), module, Pinwheel::CV4LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 109.891)), module, Pinwheel::CV5LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(80.103, 109.891)), module, Pinwheel::CV6LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(88.569, 109.891)), module, Pinwheel::CV7LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 109.891)), module, Pinwheel::CV8LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(37.372, 109.891)), module, Pinwheel::CV1GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(37.372, 109.891)), module, Pinwheel::CV1REDLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(46.501, 109.891)), module, Pinwheel::CV2GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(46.501, 109.891)), module, Pinwheel::CV2REDLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(54.967, 109.891)), module, Pinwheel::CV3GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(54.967, 109.891)), module, Pinwheel::CV3REDLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(63.434, 109.891)), module, Pinwheel::CV4GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(63.434, 109.891)), module, Pinwheel::CV4REDLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 109.891)), module, Pinwheel::CV5GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 109.891)), module, Pinwheel::CV5REDLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(80.103, 109.891)), module, Pinwheel::CV6GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(80.103, 109.891)), module, Pinwheel::CV6REDLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(88.569, 109.891)), module, Pinwheel::CV7GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(88.569, 109.891)), module, Pinwheel::CV7REDLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 109.891)), module, Pinwheel::CV8GREENLED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 109.891)), module, Pinwheel::CV8REDLED_LIGHT));
 	}
 };
 
