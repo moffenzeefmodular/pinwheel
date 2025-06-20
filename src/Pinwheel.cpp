@@ -301,8 +301,8 @@ struct PinwheelWidget : ModuleWidget {
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(46.501, 93.046)), module, Pinwheel::GATE2LED_LIGHT));
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(54.967, 93.046)), module, Pinwheel::GATE3LED_LIGHT));
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(63.434, 93.046)), module, Pinwheel::GATE4LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(80.114, 92.947)), module, Pinwheel::GATE6LED_LIGHT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 93.046)), module, Pinwheel::GATE5LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(80.114, 92.947)), module, Pinwheel::GATE5LED_LIGHT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(71.901, 93.046)), module, Pinwheel::GATE6LED_LIGHT));
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(88.569, 93.046)), module, Pinwheel::GATE7LED_LIGHT));
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 93.046)), module, Pinwheel::GATE8LED_LIGHT));
 		addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(37.372, 109.891)), module, Pinwheel::CV1GREENLED_LIGHT));
