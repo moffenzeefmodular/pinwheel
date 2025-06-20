@@ -23,6 +23,7 @@ struct Pinwheel : Module {
 
     float angle = 0.f;
     float slewedSpeed = 0.f; 
+    bool gateActive = false;
 
     Pinwheel() {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -33,37 +34,6 @@ struct Pinwheel : Module {
         configInput(MASSCVIN_INPUT, "Mass CV In");
         configOutput(GATEOUT_OUTPUT, "Gate Out");
         configOutput(CVOUT_OUTPUT, "CV Out");
-    }
-
-    // Modular function for bipolar blade waveform:
-    // +5V at blade center, -5V opposite, 0V at ±90° offsets
-    float bladeWave(float angle, float bladePhase) {
-        float normAngle = angle / (2.f * M_PI);  // Normalize [0,1)
-        float relPhase = normAngle - bladePhase;
-
-        if (relPhase < -0.5f)
-            relPhase += 1.f;
-        else if (relPhase >= 0.5f)
-            relPhase -= 1.f;
-
-        float x = relPhase;  // range [-0.5, 0.5)
-        float voltage = 0.f;
-
-        if (x < -0.25f) {
-            // -180° to -90°: -5V → 0V
-            voltage = -5.f + ((x + 0.5f) / 0.25f) * 5.f;
-        } else if (x < 0.f) {
-            // -90° to 0°: 0V → +5V
-            voltage = ((x + 0.25f) / 0.25f) * 5.f;
-        } else if (x < 0.25f) {
-            // 0° to +90°: +5V → 0V
-            voltage = (1.f - (x / 0.25f)) * 5.f;
-        } else {
-            // +90° to +180°: 0V → -5V
-            voltage = -((x - 0.25f) / 0.25f) * 5.f;
-        }
-
-        return voltage;
     }
 
     void process(const ProcessArgs& args) override {
@@ -90,31 +60,71 @@ struct Pinwheel : Module {
         // --- APPLY SLEW TO SPEED ---
         slewedSpeed += (targetSpeed - slewedSpeed) * slewAmount;
 
-// --- ROTATION LOGIC ---
-float rotationRate = slewedSpeed * 2.f * M_PI;
-angle += rotationRate * args.sampleTime;
+        // --- ROTATION LOGIC ---
+        float rotationRate = slewedSpeed * 8.f * M_PI; // radians per second
+        angle += rotationRate * args.sampleTime;
 
-if (angle >= 2.f * M_PI)
-    angle -= 2.f * M_PI;
-else if (angle < 0.f)
-    angle += 2.f * M_PI;
+        // Wrap angle between 0 and 2*PI
+        if (angle >= 2.f * M_PI)
+            angle -= 2.f * M_PI;
+        else if (angle < 0.f)
+            angle += 2.f * M_PI;
 
-// --- First blade offset so zero angle corresponds to 6 o'clock ---
-const float firstBladeOffset = 3.f * M_PI / 2.f;  // 270 deg = 6 o'clock
-float bladeAngle = angle + firstBladeOffset;
-if (bladeAngle >= 2.f * M_PI)
-    bladeAngle -= 2.f * M_PI;
+        // --- FIRST BLADE ANGLE ---
+        // For blade 0, angle is the module angle itself (rotating CCW)
+        float bladeAngle = angle;  
 
-int numBlades = (int)std::round(params[NUM_BLADES_PARAM].getValue());
-numBlades = std::max(1, std::min(8, numBlades));
+        // --- MAP bladeAngle to CV output ---
+        // We want noon (PI/2) = +5V and 6 o'clock (3*PI/2) = -5V, with waveform:
+        // 0 to +5V from 12 o'clock to 3 o'clock
+        // +5V to 0 from 3 to 6 o'clock
+        // 0 to -5V from 6 to 9 o'clock
+        // -5V to 0 from 9 to 12 o'clock
+        //
+        // We'll rotate bladeAngle by -PI/2 to align noon at 0:
+        float shiftedAngle = bladeAngle - (M_PI / 2.f);
+        if (shiftedAngle < 0.f)
+            shiftedAngle += 2.f * M_PI;
 
-// For first blade, phase = 0
-float bladePhase = 0.f / numBlades;
+        float cvOut = 0.f;
+        if (shiftedAngle <= M_PI / 2.f) {
+            // 0 to PI/2  => 0 to +5V
+            cvOut = rescale(shiftedAngle, 0.f, M_PI / 2.f, 0.f, 5.f);
+        } else if (shiftedAngle <= M_PI) {
+            // PI/2 to PI => +5V to 0
+            cvOut = rescale(shiftedAngle, M_PI / 2.f, M_PI, 5.f, 0.f);
+        } else if (shiftedAngle <= 3.f * M_PI / 2.f) {
+            // PI to 3PI/2 => 0 to -5V
+            cvOut = rescale(shiftedAngle, M_PI, 3.f * M_PI / 2.f, 0.f, -5.f);
+        } else {
+            // 3PI/2 to 2PI => -5V to 0
+            cvOut = rescale(shiftedAngle, 3.f * M_PI / 2.f, 2.f * M_PI, -5.f, 0.f);
+        }
+        outputs[CVOUT_OUTPUT].setVoltage(cvOut);
 
-// Calculate bipolar triangle wave for blade
-float cvOutput = bladeWave(bladeAngle, bladePhase);
+        // --- GATE DETECTION FOR TIP OVERLAPPING STEM ---
+        // Blade geometry parameters (should match the drawing scale)
+        const float side = 25.f * 0.7f;  // blade side length (same as drawing)
+        const float flatHeight = side * 0.866f; // height of the triangle
 
-outputs[CVOUT_OUTPUT].setVoltage(cvOutput);
+        // Tip radius is distance from center to tip of blade triangle:
+        // From drawing: tip is at a distance of side + flatHeight vertically
+        // The blade points to -Y in drawing, so tip relative to center:
+        float tipRadius = side + flatHeight;
+
+        // Coordinates of tip relative to center (rotate bladeAngle)
+        float tipX = tipRadius * cos(bladeAngle);
+        float tipY = -tipRadius * sin(bladeAngle);  // invert Y to match drawing (up is negative Y)
+
+        // Stem width (same as drawing)
+        const float stemWidth = 5.f;  // stem is 5 units wide centered at X=0, Y >= 0
+
+        // The gate is high if tip overlaps the stem:
+        // i.e. tipX within stem width and tipY >= 0 (tip below center in drawing coordinates)
+        bool isOverlappingStem = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
+
+        gateActive = isOverlappingStem;
+        outputs[GATEOUT_OUTPUT].setVoltage(gateActive ? 10.f : 0.f);
     }
 };
 
