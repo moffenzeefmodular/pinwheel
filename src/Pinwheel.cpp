@@ -76,7 +76,7 @@ struct Pinwheel : Module {
         configOutput(CV1OUT_OUTPUT, "CV Out");
     }
 
-    void process(const ProcessArgs& args) override {
+   void process(const ProcessArgs& args) override {
     float knobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
     float cvVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
     float combinedVoltage = clamp(knobVoltage + cvVoltage, -5.f, 5.f);
@@ -102,40 +102,49 @@ struct Pinwheel : Module {
 
     int numberOfBlades = clamp((int)std::round(params[NUMBLADES_PARAM].getValue()), 1, 8);
 
-    for (int i = 0; i < numberOfBlades; ++i) {
-        float bladeAngle = angle + (2.f * M_PI / numberOfBlades) * i;
-        if (bladeAngle >= 2.f * M_PI) bladeAngle -= 2.f * M_PI;
+    for (int i = 0; i < 8; ++i) {  // iterate all 8 outputs/LEDs
+        if (i < numberOfBlades) {
+            float bladeAngle = angle + (2.f * M_PI / numberOfBlades) * i;
+            if (bladeAngle >= 2.f * M_PI) bladeAngle -= 2.f * M_PI;
 
-        float shiftedAngle = bladeAngle - (M_PI / 2.f);
-        if (shiftedAngle < 0.f) shiftedAngle += 2.f * M_PI;
+            float shiftedAngle = bladeAngle - (M_PI / 2.f);
+            if (shiftedAngle < 0.f) shiftedAngle += 2.f * M_PI;
 
-        float CVout = 0.f;
-        if (shiftedAngle <= M_PI) CVout = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
-        else CVout = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
+            float CVout = 0.f;
+            if (shiftedAngle <= M_PI)
+                CVout = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
+            else
+                CVout = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
 
-        outputs[CV1OUT_OUTPUT + i].setVoltage(CVout);
+            outputs[CV1OUT_OUTPUT + i].setVoltage(CVout);
 
-        const float side = 25.f * 0.7f;
-        const float flatHeight = side * 0.866f;
-        float tipRadius = side + flatHeight;
+            const float side = 25.f * 0.7f;
+            const float flatHeight = side * 0.866f;
+            float tipRadius = side + flatHeight;
 
-        float tipX = tipRadius * cos(bladeAngle);
-        float tipY = -tipRadius * sin(bladeAngle);
+            float tipX = tipRadius * cos(bladeAngle);
+            float tipY = -tipRadius * sin(bladeAngle);
 
-        const float stemWidth = 5.f;
-        bool gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
+            const float stemWidth = 5.f;
+            bool gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
 
-        outputs[GATE1OUT_OUTPUT + i].setVoltage(gateActive ? 5.f : 0.f);
+            outputs[GATE1OUT_OUTPUT + i].setVoltage(gateActive ? 5.f : 0.f);
+            lights[GATE1LED_LIGHT + i].setBrightnessSmooth(gateActive ? 1.f : 0.f, args.sampleTime);
 
-        lights[GATE1LED_LIGHT + i].setBrightnessSmooth(gateActive ? 1.f : 0.f, args.sampleTime);
-
-        // Corrected LED indexing here (removed +1 from red LED)
-        if (CVout >= 0.f) {
-            lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
-            lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            if (CVout >= 0.f) {
+                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
+                lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            } else {
+                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+                lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
+            }
         } else {
+            // For inactive channels beyond NUMBLADES: shut off gates and LEDs
+            outputs[GATE1OUT_OUTPUT + i].setVoltage(0.f);
+            outputs[CV1OUT_OUTPUT + i].setVoltage(0.f);
+            lights[GATE1LED_LIGHT + i].setBrightnessSmooth(0.f, args.sampleTime);
             lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
-            lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
+            lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
         }
     }
 }
