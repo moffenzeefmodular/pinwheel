@@ -22,6 +22,7 @@ struct Pinwheel : Module {
     };
 
     float angle = 0.f;
+    float slewedSpeed = 0.f; 
 
     Pinwheel() {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -34,19 +35,87 @@ struct Pinwheel : Module {
         configOutput(CVOUT_OUTPUT, "CV Out");
     }
 
-void process(const ProcessArgs& args) override {
-    float knobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
-    float cvVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-    float combinedVoltage = clamp(knobVoltage + cvVoltage, -5.f, 5.f);
-    float combinedParam = rescale(combinedVoltage, -5.f, 5.f, 0.f, 1.f);
-    float normalizedSpeed = (combinedParam - 0.5f) * 2.f;
-    float rotationRate = normalizedSpeed * 2.f * M_PI;
-    angle += rotationRate * args.sampleTime;
-    if (angle >= 2.f * M_PI)
-        angle -= 2.f * M_PI;
-    else if (angle < 0.f)
-        angle += 2.f * M_PI;
-}
+    // Modular function for bipolar blade waveform:
+    // +5V at blade center, -5V opposite, 0V at ±90° offsets
+    float bladeWave(float angle, float bladePhase) {
+        float normAngle = angle / (2.f * M_PI);  // Normalize [0,1)
+        float relPhase = normAngle - bladePhase;
+
+        if (relPhase < -0.5f)
+            relPhase += 1.f;
+        else if (relPhase >= 0.5f)
+            relPhase -= 1.f;
+
+        float x = relPhase;  // range [-0.5, 0.5)
+        float voltage = 0.f;
+
+        if (x < -0.25f) {
+            // -180° to -90°: -5V → 0V
+            voltage = -5.f + ((x + 0.5f) / 0.25f) * 5.f;
+        } else if (x < 0.f) {
+            // -90° to 0°: 0V → +5V
+            voltage = ((x + 0.25f) / 0.25f) * 5.f;
+        } else if (x < 0.25f) {
+            // 0° to +90°: +5V → 0V
+            voltage = (1.f - (x / 0.25f)) * 5.f;
+        } else {
+            // +90° to +180°: 0V → -5V
+            voltage = -((x - 0.25f) / 0.25f) * 5.f;
+        }
+
+        return voltage;
+    }
+
+    void process(const ProcessArgs& args) override {
+        // --- SPEED INPUT HANDLING ---
+        float knobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+        float cvVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+        float combinedVoltage = clamp(knobVoltage + cvVoltage, -5.f, 5.f);
+        float combinedParam = rescale(combinedVoltage, -5.f, 5.f, 0.f, 1.f);
+        float targetSpeed = (combinedParam - 0.5f) * 2.f;
+
+        // --- MASS INPUT HANDLING (Mimicking SPEED) ---
+        float massKnobVoltage = rescale(params[MASS_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+        float massCVVoltage = inputs[MASSCVIN_INPUT].isConnected() ? clamp(inputs[MASSCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+        float massCombinedVoltage = clamp(massKnobVoltage + massCVVoltage, -5.f, 5.f);
+        float combinedMass = rescale(massCombinedVoltage, -5.f, 5.f, 0.f, 1.f);
+
+        // --- SLEW LOGIC ---
+        float maxSlewTime = 1.0f;     // Max 1 second
+        float minSlewTime = 0.001f;   // Min 1 millisecond
+        float slewTime = rescale(combinedMass, 0.f, 1.f, minSlewTime, maxSlewTime);
+        float slewAmount = args.sampleTime / slewTime;
+        slewAmount = clamp(slewAmount, 0.f, 1.f);
+
+        // --- APPLY SLEW TO SPEED ---
+        slewedSpeed += (targetSpeed - slewedSpeed) * slewAmount;
+
+// --- ROTATION LOGIC ---
+float rotationRate = slewedSpeed * 2.f * M_PI;
+angle += rotationRate * args.sampleTime;
+
+if (angle >= 2.f * M_PI)
+    angle -= 2.f * M_PI;
+else if (angle < 0.f)
+    angle += 2.f * M_PI;
+
+// --- First blade offset so zero angle corresponds to 6 o'clock ---
+const float firstBladeOffset = 3.f * M_PI / 2.f;  // 270 deg = 6 o'clock
+float bladeAngle = angle + firstBladeOffset;
+if (bladeAngle >= 2.f * M_PI)
+    bladeAngle -= 2.f * M_PI;
+
+int numBlades = (int)std::round(params[NUM_BLADES_PARAM].getValue());
+numBlades = std::max(1, std::min(8, numBlades));
+
+// For first blade, phase = 0
+float bladePhase = 0.f / numBlades;
+
+// Calculate bipolar triangle wave for blade
+float cvOutput = bladeWave(bladeAngle, bladePhase);
+
+outputs[CVOUT_OUTPUT].setVoltage(cvOutput);
+    }
 };
 
 struct PinwheelDisplay : Widget {
