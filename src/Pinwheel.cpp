@@ -77,16 +77,16 @@ struct Pinwheel : Module {
     }
 
    void process(const ProcessArgs& args) override {
-    float knobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
-    float cvVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-    float combinedVoltage = clamp(knobVoltage + cvVoltage, -5.f, 5.f);
-    float combinedParam = rescale(combinedVoltage, -5.f, 5.f, 0.f, 1.f);
-    float targetSpeed = (combinedParam - 0.5f) * 2.f;
+    float speedKnobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+    float speedCVVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float combinedSpeedVoltage = clamp(speedKnobVoltage + speedCVVoltage, -5.f, 5.f);
+    float speedParam = rescale(combinedSpeedVoltage, -5.f, 5.f, 0.f, 1.f);
+    float targetSpeed = (speedParam - 0.5f) * 2.f;
 
     float massKnobVoltage = rescale(params[MASS_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
     float massCVVoltage = inputs[MASSCVIN_INPUT].isConnected() ? clamp(inputs[MASSCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-    float massCombinedVoltage = clamp(massKnobVoltage + massCVVoltage, -5.f, 5.f);
-    float combinedMass = rescale(massCombinedVoltage, -5.f, 5.f, 0.f, 1.f);
+    float combinedMassVoltage = clamp(massKnobVoltage + massCVVoltage, -5.f, 5.f);
+    float combinedMass = rescale(combinedMassVoltage, -5.f, 5.f, 0.f, 1.f);
 
     float maxSlewTime = 1.f;
     float minSlewTime = 0.001f;
@@ -100,9 +100,13 @@ struct Pinwheel : Module {
     if (angle >= 2.f * M_PI) angle -= 2.f * M_PI;
     else if (angle < 0.f) angle += 2.f * M_PI;
 
-    int numberOfBlades = clamp((int)std::round(params[NUMBLADES_PARAM].getValue()), 1, 8);
+    float numBladesKnob = rescale(params[NUMBLADES_PARAM].getValue(), 1.f, 8.f, -5.f, 5.f);
+    float numBladesCV = inputs[NUMBLADESCVIN_INPUT].isConnected() ? clamp(inputs[NUMBLADESCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float combinedNumBladesVoltage = clamp(numBladesKnob + numBladesCV, -5.f, 5.f);
+    float combinedNumBlades = rescale(combinedNumBladesVoltage, -5.f, 5.f, 1.f, 8.f);
+    int numberOfBlades = clamp((int)std::round(combinedNumBlades), 1, 8);
 
-    for (int i = 0; i < 8; ++i) {  // iterate all 8 outputs/LEDs
+    for (int i = 0; i < 8; ++i) {
         if (i < numberOfBlades) {
             float bladeAngle = angle + (2.f * M_PI / numberOfBlades) * i;
             if (bladeAngle >= 2.f * M_PI) bladeAngle -= 2.f * M_PI;
@@ -139,7 +143,6 @@ struct Pinwheel : Module {
                 lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
             }
         } else {
-            // For inactive channels beyond NUMBLADES: shut off gates and LEDs
             outputs[GATE1OUT_OUTPUT + i].setVoltage(0.f);
             outputs[CV1OUT_OUTPUT + i].setVoltage(0.f);
             lights[GATE1LED_LIGHT + i].setBrightnessSmooth(0.f, args.sampleTime);
@@ -240,7 +243,11 @@ struct PinwheelDisplay : Widget {
         float side = 25.f * 0.7f;
         float flatHeight = side * 0.866f;
 
-        int numberOfBlades = clamp((int)std::round(module->params[Pinwheel::NUMBLADES_PARAM].getValue()), 1, 8);
+        float numBladesKnob = rescale(module->params[Pinwheel::NUMBLADES_PARAM].getValue(), 1.f, 8.f, -5.f, 5.f);
+        float numBladesCV = module->inputs[Pinwheel::NUMBLADESCVIN_INPUT].isConnected() ? clamp(module->inputs[Pinwheel::NUMBLADESCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+        float combinedNumBladesVoltage = clamp(numBladesKnob + numBladesCV, -5.f, 5.f);
+        float combinedNumBlades = rescale(combinedNumBladesVoltage, -5.f, 5.f, 1.f, 8.f);
+        int numberOfBlades = clamp((int)std::round(combinedNumBlades), 1, 8);
 
         for (int i = 0; i < numberOfBlades; ++i) {
             float hue = (float)i / numberOfBlades;
