@@ -99,7 +99,7 @@ struct Pinwheel : Module {
         }
     }
 
-    void process(const ProcessArgs& args) override {
+   void process(const ProcessArgs& args) override {
     float speedKnobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
     float speedCVVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
     float combinedSpeedVoltage = clamp(speedKnobVoltage + speedCVVoltage, -5.f, 5.f);
@@ -211,6 +211,23 @@ struct Pinwheel : Module {
             prevGateState[i] = false;
             triggerTimers[i] = 0.f;
         }
+    }
+
+    if (speedParam > 0.5f) {
+        outputs[DIRECTIONL_OUTPUT].setVoltage(0.f);
+        outputs[DIRECTIONR_OUTPUT].setVoltage(5.f);
+        lights[DIRECTIONLLED_LIGHT].setBrightnessSmooth(0.f, args.sampleTime);
+        lights[DIRECTIONRLED_LIGHT].setBrightnessSmooth(1.f, args.sampleTime);
+    } else if (speedParam < 0.5f) {
+        outputs[DIRECTIONL_OUTPUT].setVoltage(5.f);
+        outputs[DIRECTIONR_OUTPUT].setVoltage(0.f);
+        lights[DIRECTIONLLED_LIGHT].setBrightnessSmooth(1.f, args.sampleTime);
+        lights[DIRECTIONRLED_LIGHT].setBrightnessSmooth(0.f, args.sampleTime);
+    } else {
+        outputs[DIRECTIONL_OUTPUT].setVoltage(0.f);
+        outputs[DIRECTIONR_OUTPUT].setVoltage(0.f);
+        lights[DIRECTIONLLED_LIGHT].setBrightnessSmooth(0.f, args.sampleTime);
+        lights[DIRECTIONRLED_LIGHT].setBrightnessSmooth(0.f, args.sampleTime);
     }
 }
 };
@@ -414,10 +431,10 @@ struct PinwheelWidget : ModuleWidget {
         addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(75, 125)), module, Pinwheel::BIPOLAR_UNIPOLAR_PARAM));
 
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(7, 80)), module, Pinwheel::DIRECTIONR_OUTPUT));
-		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(7, 70)), module, Pinwheel::DIRECTIONRLED_LIGHT));
+		addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(7, 70)), module, Pinwheel::DIRECTIONRLED_LIGHT));
 
         addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(7, 60)), module, Pinwheel::DIRECTIONL_OUTPUT));
-        addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(7, 50)), module, Pinwheel::DIRECTIONLLED_LIGHT));
+        addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(7, 50)), module, Pinwheel::DIRECTIONLLED_LIGHT));
 	}
 };
 
