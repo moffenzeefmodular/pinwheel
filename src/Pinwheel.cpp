@@ -35,6 +35,8 @@ struct Pinwheel : Module {
 		CV6OUT_OUTPUT,
 		CV7OUT_OUTPUT,
 		CV8OUT_OUTPUT,
+        DIRECTIONL_OUTPUT,
+		DIRECTIONR_OUTPUT,
 		OUTPUTS_LEN
 	};
 	enum LightId {
@@ -62,6 +64,8 @@ struct Pinwheel : Module {
 		CV7REDLED_LIGHT,
 		CV8GREENLED_LIGHT,
 		CV8REDLED_LIGHT,
+		DIRECTIONLLED_LIGHT,
+        DIRECTIONRLED_LIGHT,
 		LIGHTS_LEN
 	};
 
@@ -85,6 +89,9 @@ struct Pinwheel : Module {
         configSwitch(RANGE_PARAM, 0.f, 1.f, 0.f, "Range", {"Slow", "Fast"});
         configSwitch(GATE_TRIG_PARAM, 0.f, 1.f, 0.f, "Gate/Trig", {"Gate", "Trig"});
         configSwitch(BIPOLAR_UNIPOLAR_PARAM, 0.f, 1.f, 0.f, "Bipolar/Unipolar", {"Bipolar", "Unipolar"});
+
+        configOutput(DIRECTIONL_OUTPUT, "Spinning Left");
+        configOutput(DIRECTIONR_OUTPUT, "Spinning Right");
 
         for (int i = 0; i < 8; i++) {
             configOutput(GATE1OUT_OUTPUT + i, "Gate Out");
@@ -405,6 +412,12 @@ struct PinwheelWidget : ModuleWidget {
         addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(55, 89)), module, Pinwheel::GATE_TRIG_PARAM));
 
         addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(75, 125)), module, Pinwheel::BIPOLAR_UNIPOLAR_PARAM));
+
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(7, 80)), module, Pinwheel::DIRECTIONR_OUTPUT));
+		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(7, 70)), module, Pinwheel::DIRECTIONRLED_LIGHT));
+
+        addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(7, 60)), module, Pinwheel::DIRECTIONL_OUTPUT));
+        addChild(createLightCentered<MediumLight<GreenLight>>(mm2px(Vec(7, 50)), module, Pinwheel::DIRECTIONLLED_LIGHT));
 	}
 };
 
