@@ -6,6 +6,7 @@ struct Pinwheel : Module {
 		SPEED_PARAM,
 		MASS_PARAM,
 		BLADEANGLEMOD_PARAM,
+        RANGE_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -64,6 +65,7 @@ struct Pinwheel : Module {
 
     float angle = 0.f;
     float slewedSpeed = 0.f;
+    float slewedAngleMod = 0.f;
 
     Pinwheel() {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -75,6 +77,7 @@ struct Pinwheel : Module {
         configInput(MASSCVIN_INPUT, "Mass CV In");
         configInput(NUMBLADESCVIN_INPUT, "Number of Blades CV In");
         configInput(BLADEANGLEMODCVIN_INPUT, "Blade Angle Mod CV In");
+        configSwitch(RANGE_PARAM, 0.f, 1.f, 0.f, "Range", {"Slow", "Fast"});
 
         for (int i = 0; i < 8; i++) {
             configOutput(GATE1OUT_OUTPUT + i, "Gate Out");
@@ -83,85 +86,94 @@ struct Pinwheel : Module {
     }
 
     void process(const ProcessArgs& args) override {
-        float speedKnobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
-        float speedCVVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-        float combinedSpeedVoltage = clamp(speedKnobVoltage + speedCVVoltage, -5.f, 5.f);
-        float speedParam = rescale(combinedSpeedVoltage, -5.f, 5.f, 0.f, 1.f);
-        float targetSpeed = (speedParam - 0.5f) * 2.f;
+    float speedKnobVoltage = rescale(params[SPEED_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+    float speedCVVoltage = inputs[SPEEDCVIN_INPUT].isConnected() ? clamp(inputs[SPEEDCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float combinedSpeedVoltage = clamp(speedKnobVoltage + speedCVVoltage, -5.f, 5.f);
+    float speedParam = rescale(combinedSpeedVoltage, -5.f, 5.f, 0.f, 1.f);
 
-        float massKnobVoltage = rescale(params[MASS_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
-        float massCVVoltage = inputs[MASSCVIN_INPUT].isConnected() ? clamp(inputs[MASSCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-        float combinedMassVoltage = clamp(massKnobVoltage + massCVVoltage, -5.f, 5.f);
-        float combinedMass = rescale(combinedMassVoltage, -5.f, 5.f, 0.f, 1.f);
+    // Get Range switch value (0 or 1)
+    float rangeSwitch = params[RANGE_PARAM].getValue();
 
-        float maxSlewTime = 1.f;
-        float minSlewTime = 0.001f;
-        float slewTime = rescale(combinedMass, 0.f, 1.f, minSlewTime, maxSlewTime);
-        float slewAmount = clamp(args.sampleTime / slewTime, 0.f, 1.f);
-        slewedSpeed += (targetSpeed - slewedSpeed) * slewAmount;
+    float speedMultiplier = (rangeSwitch < 0.5f) ? 0.1f : 1.0f;
 
-        float rotationRate = slewedSpeed * 8.f * M_PI;
-        angle += rotationRate * args.sampleTime;
-        if (angle >= 2.f * M_PI) angle -= 2.f * M_PI;
-        else if (angle < 0.f) angle += 2.f * M_PI;
+    float targetSpeed = (speedParam - 0.5f) * 2.f * speedMultiplier;
 
-        float numBladesKnob = rescale(params[NUMBLADES_PARAM].getValue(), 1.f, 8.f, -5.f, 5.f);
-        float numBladesCV = inputs[NUMBLADESCVIN_INPUT].isConnected() ? clamp(inputs[NUMBLADESCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
-        float combinedNumBladesVoltage = clamp(numBladesKnob + numBladesCV, -5.f, 5.f);
-        float combinedNumBlades = rescale(combinedNumBladesVoltage, -5.f, 5.f, 1.f, 8.f);
-        int numberOfBlades = clamp((int)std::round(combinedNumBlades), 1, 8);
+    float massKnobVoltage = rescale(params[MASS_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
+    float massCVVoltage = inputs[MASSCVIN_INPUT].isConnected() ? clamp(inputs[MASSCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float combinedMassVoltage = clamp(massKnobVoltage + massCVVoltage, -5.f, 5.f);
+    float combinedMass = rescale(combinedMassVoltage, -5.f, 5.f, 0.f, 1.f);
 
-        float angleModKnob = params[BLADEANGLEMOD_PARAM].getValue();
-        float angleModCV = inputs[BLADEANGLEMODCVIN_INPUT].isConnected() ? clamp(inputs[BLADEANGLEMODCVIN_INPUT].getVoltage() / 5.f, -1.f, 1.f) : 0.f;
-        float totalAngleMod = clamp(angleModKnob + angleModCV, -1.f, 1.f);
+    float maxSlewTime = 1.f;
+    float minSlewTime = 0.001f;
+    float slewTime = rescale(combinedMass, 0.f, 1.f, minSlewTime, maxSlewTime);
+    float slewAmount = clamp(args.sampleTime / slewTime, 0.f, 1.f);
+    slewedSpeed += (targetSpeed - slewedSpeed) * slewAmount;
 
-        for (int i = 0; i < 8; ++i) {
-            if (i < numberOfBlades) {
-                float baseSpacing = (2.f * M_PI / numberOfBlades);
-                float modulatedOffset = baseSpacing * i * (1.f + totalAngleMod);
-                float bladeAngle = angle + modulatedOffset;
-                if (bladeAngle >= 2.f * M_PI) bladeAngle -= 2.f * M_PI;
+    float rotationRate = slewedSpeed * 8.f * M_PI;
+    angle += rotationRate * args.sampleTime;
+    if (angle >= 2.f * M_PI) angle -= 2.f * M_PI;
+    else if (angle < 0.f) angle += 2.f * M_PI;
 
-                float shiftedAngle = bladeAngle - (M_PI / 2.f);
-                if (shiftedAngle < 0.f) shiftedAngle += 2.f * M_PI;
+    float numBladesKnob = rescale(params[NUMBLADES_PARAM].getValue(), 1.f, 8.f, -5.f, 5.f);
+    float numBladesCV = inputs[NUMBLADESCVIN_INPUT].isConnected() ? clamp(inputs[NUMBLADESCVIN_INPUT].getVoltage(), -5.f, 5.f) : 0.f;
+    float combinedNumBladesVoltage = clamp(numBladesKnob + numBladesCV, -5.f, 5.f);
+    float combinedNumBlades = rescale(combinedNumBladesVoltage, -5.f, 5.f, 1.f, 8.f);
+    int numberOfBlades = clamp((int)std::round(combinedNumBlades), 1, 8);
 
-                float CVout = 0.f;
-                if (shiftedAngle <= M_PI)
-                    CVout = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
-                else
-                    CVout = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
+    float angleModKnob = params[BLADEANGLEMOD_PARAM].getValue();
+    float angleModCV = inputs[BLADEANGLEMODCVIN_INPUT].isConnected() ? clamp(inputs[BLADEANGLEMODCVIN_INPUT].getVoltage() / 5.f, -1.f, 1.f) : 0.f;
+    float targetAngleMod = clamp(angleModKnob + angleModCV, -1.f, 1.f);
 
-                outputs[CV1OUT_OUTPUT + i].setVoltage(CVout);
+    slewedAngleMod += (targetAngleMod - slewedAngleMod) * slewAmount;
+    float totalAngleMod = slewedAngleMod;
 
-                const float side = 25.f * 0.7f;
-                const float flatHeight = side * 0.866f;
-                float tipRadius = side + flatHeight;
+    for (int i = 0; i < 8; ++i) {
+        if (i < numberOfBlades) {
+            float baseSpacing = (2.f * M_PI / numberOfBlades);
+            float modulatedOffset = baseSpacing * i * (1.f + totalAngleMod);
+            float bladeAngle = angle + modulatedOffset;
+            if (bladeAngle >= 2.f * M_PI) bladeAngle -= 2.f * M_PI;
 
-                float tipX = tipRadius * cos(bladeAngle);
-                float tipY = -tipRadius * sin(bladeAngle);
+            float shiftedAngle = bladeAngle - (M_PI / 2.f);
+            if (shiftedAngle < 0.f) shiftedAngle += 2.f * M_PI;
 
-                const float stemWidth = 5.f;
-                bool gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
+            float CVout = 0.f;
+            if (shiftedAngle <= M_PI)
+                CVout = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
+            else
+                CVout = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
 
-                outputs[GATE1OUT_OUTPUT + i].setVoltage(gateActive ? 5.f : 0.f);
-                lights[GATE1LED_LIGHT + i].setBrightnessSmooth(gateActive ? 1.f : 0.f, args.sampleTime);
+            outputs[CV1OUT_OUTPUT + i].setVoltage(CVout);
 
-                if (CVout >= 0.f) {
-                    lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
-                    lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
-                } else {
-                    lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
-                    lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
-                }
-            } else {
-                outputs[GATE1OUT_OUTPUT + i].setVoltage(0.f);
-                outputs[CV1OUT_OUTPUT + i].setVoltage(0.f);
-                lights[GATE1LED_LIGHT + i].setBrightnessSmooth(0.f, args.sampleTime);
-                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            const float side = 25.f * 0.7f;
+            const float flatHeight = side * 0.866f;
+            float tipRadius = side + flatHeight;
+
+            float tipX = tipRadius * cos(bladeAngle);
+            float tipY = -tipRadius * sin(bladeAngle);
+
+            const float stemWidth = 5.f;
+            bool gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
+
+            outputs[GATE1OUT_OUTPUT + i].setVoltage(gateActive ? 5.f : 0.f);
+            lights[GATE1LED_LIGHT + i].setBrightnessSmooth(gateActive ? 1.f : 0.f, args.sampleTime);
+
+            if (CVout >= 0.f) {
+                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
                 lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            } else {
+                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+                lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
             }
+        } else {
+            outputs[GATE1OUT_OUTPUT + i].setVoltage(0.f);
+            outputs[CV1OUT_OUTPUT + i].setVoltage(0.f);
+            lights[GATE1LED_LIGHT + i].setBrightnessSmooth(0.f, args.sampleTime);
+            lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
         }
     }
+}
 };
 
 struct PinwheelDisplay : Widget {
@@ -260,10 +272,7 @@ struct PinwheelDisplay : Widget {
     float combinedNumBlades = rescale(combinedNumBladesVoltage, -5.f, 5.f, 1.f, 8.f);
     int numberOfBlades = clamp((int)std::round(combinedNumBlades), 1, 8);
 
-    // Calculate angle mod just like in process()
-    float angleModKnob = module->params[Pinwheel::BLADEANGLEMOD_PARAM].getValue();
-    float angleModCV = module->inputs[Pinwheel::BLADEANGLEMODCVIN_INPUT].isConnected() ? clamp(module->inputs[Pinwheel::BLADEANGLEMODCVIN_INPUT].getVoltage() / 5.f, -1.f, 1.f) : 0.f;
-    float totalAngleMod = clamp(angleModKnob + angleModCV, -1.f, 1.f);
+    float totalAngleMod = module->slewedAngleMod;
 
     float baseSpacing = (2.f * M_PI / numberOfBlades);
 
@@ -357,8 +366,9 @@ struct PinwheelWidget : ModuleWidget {
 		addChild(createLightCentered<MediumLight<RedLight>>(mm2px(Vec(96.771, 109.891)), module, Pinwheel::CV8REDLED_LIGHT));
 
         addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(17.242, 80.0)), module, Pinwheel::BLADEANGLEMOD_PARAM));
-addInput(createInputCentered<PJ301MPort>(mm2px(Vec(27.039, 80.0)), module, Pinwheel::BLADEANGLEMODCVIN_INPUT));
+        addInput(createInputCentered<PJ301MPort>(mm2px(Vec(27.039, 80.0)), module, Pinwheel::BLADEANGLEMODCVIN_INPUT)); 
 
+        addParam(createParam<CKSS>(mm2px(Vec(5, 90)), module, Pinwheel::RANGE_PARAM));
 	}
 };
 
