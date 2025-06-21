@@ -7,7 +7,8 @@ struct Pinwheel : Module {
 		MASS_PARAM,
 		BLADEANGLEMOD_PARAM,
         RANGE_PARAM,
-        GATE_TRIG_PARAM,    // <-- Add this
+        GATE_TRIG_PARAM,   
+        UNIPOLAR_BIPOLAR_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -83,6 +84,7 @@ struct Pinwheel : Module {
         configInput(BLADEANGLEMODCVIN_INPUT, "Blade Angle Mod CV In");
         configSwitch(RANGE_PARAM, 0.f, 1.f, 0.f, "Range", {"Slow", "Fast"});
         configSwitch(GATE_TRIG_PARAM, 0.f, 1.f, 0.f, "Gate/Trig", {"Gate", "Trig"});
+        configSwitch(UNIPOLAR_BIPOLAR_PARAM, 0.f, 1.f, 0.f, "Bipolar/Unipolar", {"Bipolar", "Unipolar"});
 
         for (int i = 0; i < 8; i++) {
             configOutput(GATE1OUT_OUTPUT + i, "Gate Out");
@@ -390,7 +392,9 @@ struct PinwheelWidget : ModuleWidget {
 
         addParam(createParam<CKSS>(mm2px(Vec(5, 90)), module, Pinwheel::RANGE_PARAM));
 
-        addParam(createParamCentered<CKSS>(mm2px(Vec(60, 85)), module, Pinwheel::GATE_TRIG_PARAM));
+        addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(55, 89)), module, Pinwheel::GATE_TRIG_PARAM));
+
+        addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(75, 125)), module, Pinwheel::UNIPOLAR_BIPOLAR_PARAM));
 	}
 };
 
