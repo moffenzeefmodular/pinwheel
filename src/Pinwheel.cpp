@@ -8,7 +8,7 @@ struct Pinwheel : Module {
 		BLADEANGLEMOD_PARAM,
         RANGE_PARAM,
         GATE_TRIG_PARAM,   
-        UNIPOLAR_BIPOLAR_PARAM,
+        BIPOLAR_UNIPOLAR_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -84,7 +84,7 @@ struct Pinwheel : Module {
         configInput(BLADEANGLEMODCVIN_INPUT, "Blade Angle Mod CV In");
         configSwitch(RANGE_PARAM, 0.f, 1.f, 0.f, "Range", {"Slow", "Fast"});
         configSwitch(GATE_TRIG_PARAM, 0.f, 1.f, 0.f, "Gate/Trig", {"Gate", "Trig"});
-        configSwitch(UNIPOLAR_BIPOLAR_PARAM, 0.f, 1.f, 0.f, "Bipolar/Unipolar", {"Bipolar", "Unipolar"});
+        configSwitch(BIPOLAR_UNIPOLAR_PARAM, 0.f, 1.f, 0.f, "Bipolar/Unipolar", {"Bipolar", "Unipolar"});
 
         for (int i = 0; i < 8; i++) {
             configOutput(GATE1OUT_OUTPUT + i, "Gate Out");
@@ -131,6 +131,7 @@ struct Pinwheel : Module {
     float totalAngleMod = slewedAngleMod;
 
     float gateTrigSwitch = params[GATE_TRIG_PARAM].getValue();
+    bool unipolar = params[BIPOLAR_UNIPOLAR_PARAM].getValue() >= 0.5f;
 
     for (int i = 0; i < 8; ++i) {
         if (i < numberOfBlades) {
@@ -147,6 +148,10 @@ struct Pinwheel : Module {
                 CVout = rescale(shiftedAngle, 0.f, M_PI, 5.f, -5.f);
             else
                 CVout = rescale(shiftedAngle, M_PI, 2.f * M_PI, -5.f, 5.f);
+
+            if (unipolar) {
+                CVout = (CVout + 5.f) * 0.5f;
+            }
 
             outputs[CV1OUT_OUTPUT + i].setVoltage(CVout);
 
@@ -178,12 +183,17 @@ struct Pinwheel : Module {
                 }
             }
 
-            if (CVout >= 0.f) {
-                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
-                lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            if (!unipolar) {
+                if (CVout >= 0.f) {
+                    lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
+                    lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+                } else {
+                    lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+                    lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
+                }
             } else {
-                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
-                lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(clamp(-CVout / 10.f, 0.f, 1.f), args.sampleTime);
+                lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 5.f, 0.f, 1.f), args.sampleTime);
+                lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
             }
         } else {
             outputs[GATE1OUT_OUTPUT + i].setVoltage(0.f);
@@ -394,7 +404,7 @@ struct PinwheelWidget : ModuleWidget {
 
         addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(55, 89)), module, Pinwheel::GATE_TRIG_PARAM));
 
-        addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(75, 125)), module, Pinwheel::UNIPOLAR_BIPOLAR_PARAM));
+        addParam(createParamCentered<CKSSHorizontal>(mm2px(Vec(75, 125)), module, Pinwheel::BIPOLAR_UNIPOLAR_PARAM));
 	}
 };
 
