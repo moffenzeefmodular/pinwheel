@@ -7,6 +7,7 @@ struct Pinwheel : Module {
 		MASS_PARAM,
 		BLADEANGLEMOD_PARAM,
         RANGE_PARAM,
+        GATE_TRIG_PARAM,    // <-- Add this
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -66,6 +67,9 @@ struct Pinwheel : Module {
     float angle = 0.f;
     float slewedSpeed = 0.f;
     float slewedAngleMod = 0.f;
+    bool prevGateState[8] = {};
+    float triggerTimers[8] = {};
+
 
     Pinwheel() {
         config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -78,6 +82,7 @@ struct Pinwheel : Module {
         configInput(NUMBLADESCVIN_INPUT, "Number of Blades CV In");
         configInput(BLADEANGLEMODCVIN_INPUT, "Blade Angle Mod CV In");
         configSwitch(RANGE_PARAM, 0.f, 1.f, 0.f, "Range", {"Slow", "Fast"});
+        configSwitch(GATE_TRIG_PARAM, 0.f, 1.f, 0.f, "Gate/Trig", {"Gate", "Trig"});
 
         for (int i = 0; i < 8; i++) {
             configOutput(GATE1OUT_OUTPUT + i, "Gate Out");
@@ -91,11 +96,8 @@ struct Pinwheel : Module {
     float combinedSpeedVoltage = clamp(speedKnobVoltage + speedCVVoltage, -5.f, 5.f);
     float speedParam = rescale(combinedSpeedVoltage, -5.f, 5.f, 0.f, 1.f);
 
-    // Get Range switch value (0 or 1)
     float rangeSwitch = params[RANGE_PARAM].getValue();
-
     float speedMultiplier = (rangeSwitch < 0.5f) ? 0.1f : 1.0f;
-
     float targetSpeed = (speedParam - 0.5f) * 2.f * speedMultiplier;
 
     float massKnobVoltage = rescale(params[MASS_PARAM].getValue(), 0.f, 1.f, -5.f, 5.f);
@@ -123,9 +125,10 @@ struct Pinwheel : Module {
     float angleModKnob = params[BLADEANGLEMOD_PARAM].getValue();
     float angleModCV = inputs[BLADEANGLEMODCVIN_INPUT].isConnected() ? clamp(inputs[BLADEANGLEMODCVIN_INPUT].getVoltage() / 5.f, -1.f, 1.f) : 0.f;
     float targetAngleMod = clamp(angleModKnob + angleModCV, -1.f, 1.f);
-
     slewedAngleMod += (targetAngleMod - slewedAngleMod) * slewAmount;
     float totalAngleMod = slewedAngleMod;
+
+    float gateTrigSwitch = params[GATE_TRIG_PARAM].getValue();
 
     for (int i = 0; i < 8; ++i) {
         if (i < numberOfBlades) {
@@ -148,15 +151,30 @@ struct Pinwheel : Module {
             const float side = 25.f * 0.7f;
             const float flatHeight = side * 0.866f;
             float tipRadius = side + flatHeight;
-
             float tipX = tipRadius * cos(bladeAngle);
             float tipY = -tipRadius * sin(bladeAngle);
-
             const float stemWidth = 5.f;
             bool gateActive = (fabs(tipX) <= (stemWidth / 2.f)) && (tipY >= 0.f);
 
-            outputs[GATE1OUT_OUTPUT + i].setVoltage(gateActive ? 5.f : 0.f);
-            lights[GATE1LED_LIGHT + i].setBrightnessSmooth(gateActive ? 1.f : 0.f, args.sampleTime);
+            if (gateTrigSwitch < 0.5f) {
+                outputs[GATE1OUT_OUTPUT + i].setVoltage(gateActive ? 5.f : 0.f);
+                lights[GATE1LED_LIGHT + i].setBrightnessSmooth(gateActive ? 1.f : 0.f, args.sampleTime);
+            } else {
+                bool gateRisingEdge = gateActive && !prevGateState[i];
+                if (gateRisingEdge) {
+                    triggerTimers[i] = 0.001f;
+                }
+                prevGateState[i] = gateActive;
+
+                if (triggerTimers[i] > 0.f) {
+                    triggerTimers[i] -= args.sampleTime;
+                    outputs[GATE1OUT_OUTPUT + i].setVoltage(5.f);
+                    lights[GATE1LED_LIGHT + i].setBrightnessSmooth(1.f, args.sampleTime);
+                } else {
+                    outputs[GATE1OUT_OUTPUT + i].setVoltage(0.f);
+                    lights[GATE1LED_LIGHT + i].setBrightnessSmooth(0.f, args.sampleTime);
+                }
+            }
 
             if (CVout >= 0.f) {
                 lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(clamp(CVout / 10.f, 0.f, 1.f), args.sampleTime);
@@ -171,6 +189,8 @@ struct Pinwheel : Module {
             lights[GATE1LED_LIGHT + i].setBrightnessSmooth(0.f, args.sampleTime);
             lights[CV1GREENLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
             lights[CV1REDLED_LIGHT + i * 2].setBrightnessSmooth(0.f, args.sampleTime);
+            prevGateState[i] = false;
+            triggerTimers[i] = 0.f;
         }
     }
 }
@@ -369,6 +389,8 @@ struct PinwheelWidget : ModuleWidget {
         addInput(createInputCentered<PJ301MPort>(mm2px(Vec(27.039, 80.0)), module, Pinwheel::BLADEANGLEMODCVIN_INPUT)); 
 
         addParam(createParam<CKSS>(mm2px(Vec(5, 90)), module, Pinwheel::RANGE_PARAM));
+
+        addParam(createParamCentered<CKSS>(mm2px(Vec(60, 85)), module, Pinwheel::GATE_TRIG_PARAM));
 	}
 };
 
